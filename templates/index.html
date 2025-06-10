@@ -1,0 +1,96 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Your Room</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom CSS for room, handles, and dimensions -->
+    <style>
+        /* The main canvas area */
+        #canvas {
+            background-color: #f0f0f0;
+            background-image:
+                linear-gradient(to right, #ddd 1px, transparent 1px),
+                linear-gradient(to bottom, #ddd 1px, transparent 1px);
+            background-size: 20px 20px;
+            padding: 2rem; /* Give space for the room to not be at the edge */
+        }
+        /* The resizable room container */
+        #room-container {
+            background-color: white;
+            position: relative;
+            box-shadow: 0 0 0 2px #9ca3af; /* gray-400 border */
+        }
+        /* Class for a selected item on the canvas */
+        .selected {
+            border: 2px solid #3b82f6; /* blue-500 */
+        }
+        /* General handle style */
+        .handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            z-index: 10;
+        }
+        /* Furniture Handles */
+        .resize-handle { bottom: -6px; right: -6px; cursor: nwse-resize; }
+        .rotate-handle { top: -20px; left: calc(50% - 6px); cursor: alias; }
+
+        /* Room Wall Handles */
+        .room-handle { background-color: #6b7280; } /* gray-500 */
+        .room-handle.top-left     { top: -6px; left: -6px; cursor: nwse-resize; }
+        .room-handle.top-right    { top: -6px; right: -6px; cursor: nesw-resize; }
+        .room-handle.bottom-left  { bottom: -6px; left: -6px; cursor: nesw-resize; }
+        .room-handle.bottom-right { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+        /* Dimension Display Style */
+        .dimension-display {
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 6px;
+            font-size: 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            pointer-events: none; /* So it doesn't interfere with clicks */
+            display: none; /* Hidden by default */
+        }
+        .is-resizing .dimension-display {
+            display: block; /* Show only when resizing */
+        }
+    </style>
+</head>
+<body class="font-sans bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white shadow-lg flex flex-col">
+            <h1 class="text-2xl font-bold p-4 border-b">Furnish</h1>
+            <div id="furniture-list" class="p-4 space-y-4 overflow-y-auto">
+                <!-- Furniture items will be injected here by JavaScript -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col">
+            <div class="p-4 border-b bg-white flex justify-end space-x-2">
+                <button id="delete-btn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50" disabled>Delete</button>
+            </div>
+            <!-- The Canvas area -->
+            <div id="canvas" class="flex-1 flex items-center justify-center">
+                <!-- The adjustable room will be created here by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Main JavaScript File -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
