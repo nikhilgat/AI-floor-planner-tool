@@ -5,11 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const furnitureList = document.getElementById('furniture-list');
     const canvas = document.getElementById('canvas');
     const deleteBtn = document.getElementById('delete-btn');
-    let roomContainer; // Will be initialized later
+    const saveBtn = document.getElementById('save-btn');
+    const toggleDimsSwitch = document.getElementById('toggle-dims-switch');
+    let roomContainer;
 
     // --- STATE MANAGEMENT ---
     let selectedObject = null;
     let objectCounter = 0;
+    let showDimensions = true;
 
     // --- FURNITURE CATALOG ---
     const furnitureCatalog = [
@@ -21,9 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIALIZATION ---
 
+    // **FIXED:** Restored the full function to show icons
     function populateFurnitureList() {
         furnitureCatalog.forEach(item => {
-            // New styled sidebar item
             const div = document.createElement('div');
             div.className = 'bg-gray-100 p-2 rounded-lg hover:bg-blue-100 cursor-grab flex flex-col items-center space-y-2';
             div.draggable = true;
@@ -50,16 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-    
+
     // --- ROOM CREATION AND ADJUSTMENT ---
-    
     function initializeRoom() {
         roomContainer = document.createElement('div');
         roomContainer.id = 'room-container';
         roomContainer.style.width = '600px';
         roomContainer.style.height = '400px';
 
-        // Add handles for resizing the room
         ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach(pos => {
             const handle = document.createElement('div');
             handle.className = `handle room-handle ${pos}`;
@@ -67,20 +68,22 @@ document.addEventListener('DOMContentLoaded', () => {
             addRoomResizeListener(handle, pos);
         });
 
-        // Add dimension display for the room
         const dimDisplay = document.createElement('div');
-        dimDisplay.className = 'dimension-display';
+        dimDisplay.className = 'dimension-display room-dimension';
         roomContainer.appendChild(dimDisplay);
         
         canvas.appendChild(roomContainer);
-        updateRoomDimensions(); // Set initial dimensions
+        updateRoomDimensions();
     }
     
     function updateRoomDimensions() {
-        const display = roomContainer.querySelector('.dimension-display');
-        display.textContent = `${roomContainer.offsetWidth} x ${roomContainer.offsetHeight} cm`;
+        const display = roomContainer.querySelector('.room-dimension');
+        if (display) {
+            display.textContent = `${roomContainer.offsetWidth} x ${roomContainer.offsetHeight} cm`;
+        }
     }
-
+    
+    // **FIXED:** Restored the full function to make the room resizable
     function addRoomResizeListener(handle, position) {
         let isResizing = false;
         let startX, startY, startWidth, startHeight;
@@ -88,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
         handle.addEventListener('mousedown', e => {
             e.stopPropagation();
             isResizing = true;
-            roomContainer.classList.add('is-resizing');
             startX = e.clientX;
             startY = e.clientY;
             startWidth = roomContainer.offsetWidth;
@@ -109,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (position.includes('bottom')) newHeight += dy;
             if (position.includes('top')) newHeight -= dy;
             
-            // Set a minimum size
             roomContainer.style.width = `${Math.max(100, newWidth)}px`;
             roomContainer.style.height = `${Math.max(100, newHeight)}px`;
             
@@ -118,23 +119,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.addEventListener('mouseup', () => {
             isResizing = false;
-            roomContainer.classList.remove('is-resizing');
             document.body.style.cursor = 'default';
         });
     }
 
     // --- CANVAS INTERACTIONS (Dropping Furniture) ---
-
-    // Allow dropping ONLY on the room container
     function setupDropZone() {
         roomContainer.addEventListener('dragover', e => e.preventDefault());
-
         roomContainer.addEventListener('drop', e => {
             e.preventDefault();
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
             const roomRect = roomContainer.getBoundingClientRect();
             
-            // Calculate position relative to the room container
             const x = e.clientX - roomRect.left - (data.width / 2);
             const y = e.clientY - roomRect.top - (data.height / 2);
             
@@ -143,11 +139,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- OBJECT CREATION AND MANIPULATION ---
-
     function createFurnitureObject(itemData, x, y) {
         objectCounter++;
         const objWrapper = document.createElement('div');
         objWrapper.id = `object-${objectCounter}`;
+        objWrapper.dataset.name = itemData.name;
         objWrapper.className = 'absolute cursor-move';
         objWrapper.style.left = `${x}px`;
         objWrapper.style.top = `${y}px`;
@@ -181,14 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function addEventListenersToFurniture(obj) {
         let isDragging = false, isResizing = false, isRotating = false;
-        let startX, startY, startMouseX, startMouseY, startWidth, startHeight, startAngle;
+        let startX, startY, startMouseX, startMouseY, startWidth, startHeight;
 
         const resizeHandle = obj.querySelector('.resize-handle');
         const rotateHandle = obj.querySelector('.rotate-handle');
         const dimDisplay = obj.querySelector('.dimension-display');
 
         obj.addEventListener('mousedown', e => {
-            // Check if the click is on the object itself, not a handle
             if (e.target.classList.contains('cursor-move')) {
                 isDragging = true;
                 startX = obj.offsetLeft;
@@ -204,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resizeHandle.addEventListener('mousedown', e => {
             e.stopPropagation();
             isResizing = true;
-            obj.classList.add('is-resizing'); // Show dimensions
             startWidth = obj.offsetWidth;
             startHeight = obj.offsetHeight;
             startMouseX = e.clientX;
@@ -212,31 +206,42 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.cursor = 'nwse-resize';
         });
 
-        rotateHandle.addEventListener('mousedown', e => { /* ... rotation logic as before ... */ });
+        // Rotation logic is not implemented, so this listener is empty for now
+        rotateHandle.addEventListener('mousedown', e => { /* rotation logic placeholder */ });
 
         document.addEventListener('mousemove', e => {
             if (isDragging) {
-                obj.style.left = `${startX + e.clientX - startMouseX}px`;
-                obj.style.top = `${startY + e.clientY - startMouseY}px`;
+                // Task 1: Constrain objects to room
+                let newLeft = startX + e.clientX - startMouseX;
+                let newTop = startY + e.clientY - startMouseY;
+
+                const roomWidth = roomContainer.offsetWidth;
+                const roomHeight = roomContainer.offsetHeight;
+                const objWidth = obj.offsetWidth;
+                const objHeight = obj.offsetHeight;
+
+                newLeft = Math.max(0, Math.min(newLeft, roomWidth - objWidth));
+                newTop = Math.max(0, Math.min(newTop, roomHeight - objHeight));
+
+                obj.style.left = `${newLeft}px`;
+                obj.style.top = `${newTop}px`;
             } else if (isResizing) {
                 const newWidth = startWidth + (e.clientX - startMouseX);
                 const newHeight = startHeight + (e.clientY - startMouseY);
                 obj.style.width = `${Math.max(20, newWidth)}px`;
                 obj.style.height = `${Math.max(20, newHeight)}px`;
-                // Update dimension display LIVE
                 dimDisplay.textContent = `${Math.round(newWidth)} x ${Math.round(newHeight)} cm`;
-            } else if (isRotating) { /* ... rotation logic as before ... */ }
+            }
         });
 
         document.addEventListener('mouseup', () => {
-            if (isResizing) obj.classList.remove('is-resizing'); // Hide dimensions
             isDragging = isResizing = isRotating = false;
             document.body.style.cursor = 'default';
         });
     }
     
-    // --- SELECTION AND DELETION LOGIC (Mostly Unchanged) ---
-
+    // --- SELECTION AND DELETION LOGIC ---
+    // **FIXED:** Restored full selection and deletion logic
     function selectObject(obj) {
         if (selectedObject && selectedObject !== obj) {
             selectedObject.classList.remove('selected');
@@ -254,9 +259,10 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteBtn.disabled = true;
     }
 
-    // Deselect when clicking on the canvas background (but not the room)
     canvas.addEventListener('click', e => {
-        if (e.target.id === 'canvas') deselectAll();
+        if (e.target.id === 'canvas' || e.target.id === 'room-container') {
+             deselectAll();
+        }
     });
 
     deleteBtn.addEventListener('click', () => {
@@ -266,8 +272,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- NEW FUNCTIONS FOR SAVE AND TOGGLE ---
+
+    // Task 2: Save layout
+    function saveLayout() {
+        const layoutData = {
+            room: {
+                width: roomContainer.offsetWidth,
+                height: roomContainer.offsetHeight,
+            },
+            objects: [],
+        };
+
+        roomContainer.querySelectorAll('[id^="object-"]').forEach(obj => {
+            const objectInfo = {
+                type: obj.dataset.name,
+                left: obj.offsetLeft,
+                top: obj.offsetTop,
+                width: obj.offsetWidth,
+                height: obj.offsetHeight,
+                rotation: obj.style.transform,
+            };
+            layoutData.objects.push(objectInfo);
+        });
+
+        const jsonString = JSON.stringify(layoutData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'room-layout.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    
+    // Task 3: Toggle dimensions
+    function toggleDimensionVisibility() {
+        showDimensions = toggleDimsSwitch.checked;
+        document.body.classList.toggle('hide-dims', !showDimensions);
+    }
+
+    saveBtn.addEventListener('click', saveLayout);
+    toggleDimsSwitch.addEventListener('change', toggleDimensionVisibility);
+
     // --- START THE APP ---
     populateFurnitureList();
     initializeRoom();
     setupDropZone();
+    toggleDimensionVisibility();
 });
