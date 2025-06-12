@@ -19,7 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: 'Sofa', image: '/static/images/sofa.svg', width: 200, height: 90 },
         { name: 'Table', image: '/static/images/table.svg', width: 120, height: 70 },
         { name: 'Chair', image: '/static/images/chair.svg', width: 50, height: 50 },
-        { name: 'Rug', image: '/static/images/rug.svg', width: 240, height: 160 },
+        { name: 'Bed', image: '/static/images/bed.svg', width: 240, height: 160 },
+        { name: 'Wardrobe', image: '/static/images/wardrobe.svg', width: 240, height: 160 },
+        { name: 'Bedside Table', image: '/static/images/bedside_table.svg', width: 240, height: 160 },
     ];
 
     // --- INITIALIZATION ---
