@@ -18,8 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- CATALOGS ---
     const furnitureCatalog = [
         { name: 'Sofa', image: '/static/images/sofa.svg', width: 200, height: 90, zHeight: 85 },
-        { name: 'Table', image: '/static/images/table.svg', width: 120, height: 70, zHeight: 75 },
-        { name: 'Chair', image: '/static/images/chair.svg', width: 50, height: 50, zHeight: 90 },
+        { name: 'Study Table', image: '/static/images/study_table.svg', width: 120, height: 70, zHeight: 75 },
+        { name: 'Study Chair', image: '/static/images/study_chair.svg', width: 50, height: 50, zHeight: 90 },
         { name: 'Bed', image: '/static/images/bed.svg', width: 180, height: 200, zHeight: 55 },
         { name: 'Wardrobe', image: '/static/images/wardrobe.svg', width: 150, height: 60, zHeight: 200 },
         { name: 'Bedside Table', image: '/static/images/bedside_table.svg', width: 45, height: 45, zHeight: 60 },
