@@ -3,93 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plan Your Room</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom CSS -->
-    <style>
-        /* Main canvas and room styles */
-        #canvas { background-color: #f0f0f0; background-image: linear-gradient(to right, #ddd 1px, transparent 1px), linear-gradient(to bottom, #ddd 1px, transparent 1px); background-size: 20px 20px; padding: 2rem; }
-        #room-container { background-color: white; position: relative; box-shadow: 0 0 0 2px #9ca3af; }
-
-        /* General selected style */
-        .selected {
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.7) !important;
-            border: 2px solid #3b82f6 !important;
-        }
-        
-        /* NEW: Collision Style */
-        .colliding {
-            box-shadow: 0 0 10px 3px rgba(239, 68, 68, 0.8) !important; /* red-500 glow */
-        }
-
-        /* Furniture styles */
-        .furniture { position: absolute; cursor: move; border: 2px solid transparent; }
-        
-        /* Wall Feature styles */
-        .wall-feature { position: absolute; background-color: #f0f0f0; border-left: 2px solid #6b7280; border-right: 2px solid #6b7280; cursor: move; z-index: 5; box-sizing: border-box; }
-        .wall-feature.on-vertical-wall { border-left: none; border-right: none; border-top: 2px solid #6b7280; border-bottom: 2px solid #6b7280; }
-        .wall-feature.window { background-color: #a7d8f9; }
-        .wall-feature.selected { border-color: #3b82f6 !important; }
-
-        /* General Handle Styles */
-        .handle { position: absolute; width: 12px; height: 12px; background-color: #3b82f6; border: 2px solid white; border-radius: 50%; z-index: 10; opacity: 0; transition: opacity 0.2s, background-color 0.1s; }
-        .furniture.selected .handle { opacity: 1; }
-        .resize-handle { bottom: -6px; right: -6px; cursor: nwse-resize; }
-        .rotate-handle { top: -20px; left: calc(50% - 6px); cursor: alias; }
-        .rotate-handle.snapped { background-color: #22c55e; }
-
-        /* Room Wall Resize Handles */
-        .room-handle { position: absolute; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; background-color: #6b7280; z-index: 20; }
-        .room-handle.top-left { top: -6px; left: -6px; cursor: nwse-resize; }
-        .room-handle.top-right { top: -6px; right: -6px; cursor: nesw-resize; }
-        .room-handle.bottom-left { bottom: -6px; left: -6px; cursor: nesw-resize; }
-        .room-handle.bottom-right { bottom: -6px; right: -6px; cursor: nwse-resize; }
-
-        /* Dimension Display */
-        .dimension-display { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 6px; font-size: 12px; border-radius: 4px; white-space: nowrap; pointer-events: none; display: block; }
-        .hide-dims .dimension-display { display: none; }
-    </style>
+    <title>🏗️ 3D Room Planner</title>
+    <link rel="stylesheet" href="../static/styles/styles.css">
+    <script src="../static/js/app.js" defer></script>
 </head>
-<body class="font-sans bg-gray-100">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <aside class="w-72 bg-white shadow-lg flex flex-col">
-            <h1 class="text-2xl font-bold p-4 border-b">Pflegeassistenz Navigator</h1>
-            <div class="p-4 space-y-4 overflow-y-auto">
-                <h2 class="text-lg font-semibold border-b pb-2">Furniture</h2>
-                <div id="furniture-list" class="space-y-4"></div>
-                <h2 class="text-lg font-semibold border-b pb-2 mt-6">Architectural</h2>
-                <div id="architectural-list" class="space-y-4"></div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col">
-            <div class="p-4 border-b bg-white flex justify-end items-center space-x-4">
-                <div class="flex items-center space-x-2 mr-auto">
-                    <span class="text-sm font-medium text-gray-700">Show Dimensions</span>
-                    <label for="toggle-dims-switch" class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-dims-switch" class="sr-only peer" checked>
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                </div>
-                
-                <!-- Unified Contextual Settings Panel -->
-                <div id="contextual-settings" class="flex items-center space-x-2">
-                    <!-- This will be populated by JavaScript -->
-                </div>
-
-                <button id="load-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Load Layout</button>
-                <input type="file" id="load-layout-input" class="hidden" accept=".json">
-                <button id="save-btn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Save Layout</button>
-                <button id="delete-btn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50" disabled>Delete</button>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>🏗️ 3D Room Planner</h1>
+            
+            <div class="view-controls">
+                <button class="view-btn active" onclick="setView('isometric')">Isometric</button>
+                <button class="view-btn" onclick="setView('top')">Top View</button>
             </div>
             
-            <div id="canvas" class="flex-1 flex items-center justify-center"></div>
-        </main>
-    </div>
+            <div class="furniture-list" id="furnitureList">
+                <div class="furniture-item" draggable="true" data-type="bed">
+                    <span class="furniture-icon">🛏️</span>
+                    <div class="furniture-name">Bed</div>
+                </div>
+                <div class="furniture-item" draggable="true" data-type="wardrobe">
+                    <span class="furniture-icon">🚪</span>
+                    <div class="furniture-name">Wardrobe</div>
+                </div>
+                <div class="furniture-item" draggable="true" data-type="study-table">
+                    <span class="furniture-icon">🪑</span>
+                    <div class="furniture-name">Study Table</div>
+                </div>
+                <div class="furniture-item" draggable="true" data-type="study-chair">
+                    <span class="furniture-icon">💺</span>
+                    <div class="furniture-name">Study Chair</div>
+                </div>
+                <div class="furniture-item" draggable="true" data-type="sofa">
+                    <span class="furniture-icon">🛋️</span>
+                    <div class="furniture-name">Sofa</div>
+                </div>
+                <div class="furniture-item" draggable="true" data-type="bedside-table">
+                    <span class="furniture-icon">🕯️</span>
+                    <div class="furniture-name">Bedside Table</div>
+                </div>
+            </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="roomWidth">Room Width (px):</label>
+                    <input type="number" id="roomWidth" value="800" min="400" max="1200" step="50">
+                </div>
+                <div class="control-group">
+                    <label for="roomHeight">Room Height (px):</label>
+                    <input type="number" id="roomHeight" value="600" min="300" max="900" step="50">
+                </div>
+                <div class="control-group">
+                    <label for="floorTexture">Floor Pattern:</label>
+                    <select id="floorTexture" onchange="changeFloorTexture()">
+                        <option value="tiles">Tiles</option>
+                        <option value="wood">Wooden</option>
+                        <option value="carpet">Carpet</option>
+                        <option value="marble">Marble</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="info-panel">
+                <h3>Controls</h3>
+                <p>• <strong>Drag:</strong> Move furniture from list to room</p>
+                <p>• <strong>Click & Drag:</strong> Reposition placed items</p>
+                <p>• <strong>Double-click:</strong> Remove furniture</p>
+                <p>• <strong>View Buttons:</strong> Change camera angle</p>
+                <p>• <strong>Mouse Wheel:</strong> Zoom in/out (coming soon)</p>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="toolbar">
+                <button onclick="clearRoom()">🗑️ Clear Room</button>
+                <button onclick="saveLayout()">💾 Save Design</button>
+                <button onclick="loadLayout()">📂 Load Design</button>
+                <button onclick="exportImage()">📸 Screenshot</button>
+                <button onclick="randomLayout()">🎲 Random Layout</button>
+                <span style="margin-left: auto; color: #2c3e50; font-weight: 700; font-size: 1.1rem;">
+                    Furniture Count: <span id="itemCount" style="color: #3498db;">0</span>
+                </span>
+            </div>
+            <div class="room-container">
+                <div class="room-3d" id="room3d">
+                    <div class="room-floor" id="roomFloor">
+                        <div class="room-walls">
+                            <div class="wall wall-back"></div>
+                            <div class="wall wall-left"></div>
+                            <div class="wall wall-right"></div>
+                            <div class="wall wall-front"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

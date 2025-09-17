@@ -1,524 +1,529 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM ELEMENTS ---
-    const furnitureList = document.getElementById('furniture-list');
-    const architecturalList = document.getElementById('architectural-list');
-    const canvas = document.getElementById('canvas');
-    const deleteBtn = document.getElementById('delete-btn');
-    const saveBtn = document.getElementById('save-btn');
-    const toggleDimsSwitch = document.getElementById('toggle-dims-switch');
-    const loadBtn = document.getElementById('load-btn');
-    const loadLayoutInput = document.getElementById('load-layout-input');
-    const contextualSettings = document.getElementById('contextual-settings');
-    let roomContainer;
+        let selectedElement = null;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let furnitureCounter = 0;
+        let currentView = 'isometric';
 
-    // --- STATE ---
-    let selectedObject = null;
-    let objectCounter = 0;
-
-    // --- CATALOGS ---
-    const furnitureCatalog = [
-        { name: 'Sofa', image: '/static/images/sofa.svg', width: 200, height: 90, zHeight: 85 },
-        { name: 'Study Table', image: '/static/images/study_table.svg', width: 120, height: 70, zHeight: 75 },
-        { name: 'Study Chair', image: '/static/images/study_chair.svg', width: 50, height: 50, zHeight: 90 },
-        { name: 'Bed', image: '/static/images/bed.svg', width: 180, height: 200, zHeight: 55 },
-        { name: 'Wardrobe', image: '/static/images/wardrobe.svg', width: 150, height: 60, zHeight: 200 },
-        { name: 'Bedside Table', image: '/static/images/bedside_table.svg', width: 45, height: 45, zHeight: 60 },
-    ];
-    const architecturalCatalog = [
-        { name: 'Door', type: 'door', image: '/static/images/door.svg', width: 90, openingHeight: 210 },
-        { name: 'Window', type: 'window', image: '/static/images/window.svg', width: 120, openingHeight: 100 }
-    ];
-
-    // --- HELPER & UTILITY FUNCTIONS ---
-    const getRotationAngle = (obj) => {
-        const match = obj.style.transform.match(/rotate\(([^deg]+)deg\)/);
-        return match ? parseFloat(match[1]) : 0;
-    };
-
-    const updateFurnitureDimensionLabel = (obj) => {
-        const dimDisplay = obj.querySelector('.dimension-display');
-        if (!dimDisplay) return;
-        const angle = getRotationAngle(obj);
-        dimDisplay.textContent = `${obj.offsetWidth}x${obj.offsetHeight}x${obj.dataset.zHeight} cm (${Math.round(angle)}°)`;
-    };
-
-    const updateWallFeatureDimensionLabel = (obj) => {
-        const dimDisplay = obj.querySelector('.dimension-display');
-        if (!dimDisplay) return;
-        const width = obj.classList.contains('on-vertical-wall') ? obj.offsetHeight : obj.offsetWidth;
-        if (obj.classList.contains('window')) {
-            dimDisplay.textContent = `W:${width}, H:${obj.dataset.openingHeight}, Sill:${obj.dataset.heightFromGround} cm`;
-        } else {
-            dimDisplay.textContent = `W:${width}, H:${obj.dataset.openingHeight} cm`;
+        // Initialize the application
+        function init() {
+            setupDragAndDrop();
+            setupRoomControls();
+            updateItemCount();
+            setupViewControls();
         }
-    };
 
-    const updateRoomDimensions = () => {
-        const display = roomContainer.querySelector('.room-dimension');
-        if (display) display.textContent = `${roomContainer.offsetWidth} x ${roomContainer.offsetHeight} cm`;
-    };
+        // Setup drag and drop functionality
+        function setupDragAndDrop() {
+            const furnitureItems = document.querySelectorAll('.furniture-item');
+            const roomFloor = document.getElementById('roomFloor');
 
-    // --- COLLISION DETECTION (SAT) ---
-    function getVertices(obj) {
-        const box = { x: obj.offsetLeft, y: obj.offsetTop, w: obj.offsetWidth, h: obj.offsetHeight };
-        const angle = getRotationAngle(obj) * Math.PI / 180;
-        const cos = Math.cos(angle); const sin = Math.sin(angle);
-        const cx = box.x + box.w / 2; const cy = box.y + box.h / 2;
-        const vertices = [];
-        for (let i = 0; i < 4; i++) {
-            const w_half = (i < 2 ? box.w : -box.w) / 2;
-            const h_half = (i % 3 === 0 ? box.h : -box.h) / 2;
-            vertices.push({
-                x: cx + (w_half * cos - h_half * sin),
-                y: cy + (w_half * sin + h_half * cos),
+            furnitureItems.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+            });
+
+            roomFloor.addEventListener('dragover', handleDragOver);
+            roomFloor.addEventListener('drop', handleDrop);
+        }
+
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.currentTarget.dataset.type);
+            e.currentTarget.style.opacity = '0.6';
+            
+            setTimeout(() => {
+                e.currentTarget.style.opacity = '1';
+            }, 150);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const furnitureType = e.dataTransfer.getData('text/plain');
+            const room = e.currentTarget;
+            const rect = room.getBoundingClientRect();
+            
+            // Adjust coordinates based on current view
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+            
+            // Center the item and add some randomness
+            x = Math.max(20, Math.min(x - 50, room.clientWidth - 150));
+            y = Math.max(20, Math.min(y - 40, room.clientHeight - 100));
+            
+            createFurniture3D(furnitureType, x, y);
+        }
+
+        // Create 3D furniture elements
+        function createFurniture3D(type, x, y) {
+            const room = document.getElementById('roomFloor');
+            const furniture = document.createElement('div');
+            const id = `furniture_${++furnitureCounter}`;
+            
+            furniture.id = id;
+            furniture.className = `placed-furniture ${type}`;
+            furniture.style.left = x + 'px';
+            furniture.style.top = y + 'px';
+            furniture.style.zIndex = furnitureCounter + 10;
+            
+            // Create 3D model based on furniture type
+            furniture.innerHTML = create3DModel(type);
+            
+            // Add event listeners
+            furniture.addEventListener('mousedown', handleMouseDown);
+            furniture.addEventListener('dblclick', handleDoubleClick);
+            
+            room.appendChild(furniture);
+            updateItemCount();
+            
+            // Add entrance animation
+            furniture.style.transform = 'scale(0) translateZ(50px)';
+            furniture.style.opacity = '0';
+            
+            setTimeout(() => {
+                furniture.style.transform = 'scale(1) translateZ(10px)';
+                furniture.style.opacity = '1';
+            }, 50);
+        }
+
+        // Create 3D models for different furniture types
+        function create3DModel(type) {
+            switch(type) {
+                case 'bed':
+                    return `
+                        <div class="furniture-3d bed-3d">
+                            <div class="bed-top">🛏️</div>
+                            <div class="bed-side1"></div>
+                            <div class="bed-side2"></div>
+                        </div>
+                    `;
+                case 'wardrobe':
+                    return `
+                        <div class="furniture-3d wardrobe-3d">
+                            <div class="wardrobe-top">🚪</div>
+                            <div class="wardrobe-side1"></div>
+                            <div class="wardrobe-side2"></div>
+                        </div>
+                    `;
+                case 'study-table':
+                    return `
+                        <div class="furniture-3d study-table-3d">
+                            <div class="study-table-top">📚</div>
+                            <div class="study-table-side1"></div>
+                            <div class="study-table-side2"></div>
+                        </div>
+                    `;
+                case 'study-chair':
+                    return `
+                        <div class="furniture-3d study-chair-3d">
+                            <div class="study-chair-top">💺</div>
+                            <div class="study-chair-side1"></div>
+                        </div>
+                    `;
+                case 'sofa':
+                    return `
+                        <div class="furniture-3d sofa-3d">
+                            <div class="sofa-top">🛋️</div>
+                            <div class="sofa-side1"></div>
+                            <div class="sofa-side2"></div>
+                        </div>
+                    `;
+                case 'bedside-table':
+                    return `
+                        <div class="furniture-3d bedside-table-3d">
+                            <div class="bedside-table-top">🕯️</div>
+                            <div class="bedside-table-side1"></div>
+                            <div class="bedside-table-side2"></div>
+                        </div>
+                    `;
+                default:
+                    return '<div>📦</div>';
+            }
+        }
+
+        // Handle mouse interactions
+        function handleMouseDown(e) {
+            e.preventDefault();
+            selectedElement = e.currentTarget;
+            isDragging = true;
+            
+            // Clear previous selection
+            document.querySelectorAll('.placed-furniture').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedElement.classList.add('selected');
+            
+            const rect = selectedElement.getBoundingClientRect();
+            const roomRect = document.getElementById('roomFloor').getBoundingClientRect();
+            
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging || !selectedElement) return;
+            
+            const room = document.getElementById('roomFloor');
+            const roomRect = room.getBoundingClientRect();
+            
+            let newX = e.clientX - roomRect.left - dragOffset.x;
+            let newY = e.clientY - roomRect.top - dragOffset.y;
+            
+            // Constrain to room boundaries
+            newX = Math.max(10, Math.min(newX, room.clientWidth - selectedElement.offsetWidth - 10));
+            newY = Math.max(10, Math.min(newY, room.clientHeight - selectedElement.offsetHeight - 10));
+            
+            selectedElement.style.left = newX + 'px';
+            selectedElement.style.top = newY + 'px';
+        }
+
+        function handleMouseUp() {
+            if (selectedElement) {
+                selectedElement.classList.remove('selected');
+            }
+            selectedElement = null;
+            isDragging = false;
+            
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        function handleDoubleClick(e) {
+            e.preventDefault();
+            const element = e.currentTarget;
+            
+            // Add removal animation
+            element.style.transform = 'scale(0) rotateX(180deg) translateZ(-100px)';
+            element.style.opacity = '0';
+            
+            setTimeout(() => {
+                element.remove();
+                updateItemCount();
+            }, 300);
+        }
+
+        // Setup room controls
+        function setupRoomControls() {
+            const roomWidthInput = document.getElementById('roomWidth');
+            const roomHeightInput = document.getElementById('roomHeight');
+            
+            roomWidthInput.addEventListener('input', updateRoomSize);
+            roomHeightInput.addEventListener('input', updateRoomSize);
+        }
+
+        function updateRoomSize() {
+            const roomFloor = document.getElementById('roomFloor');
+            const room3d = document.getElementById('room3d');
+            const width = document.getElementById('roomWidth').value;
+            const height = document.getElementById('roomHeight').value;
+            
+            roomFloor.style.width = width + 'px';
+            roomFloor.style.height = height + 'px';
+            room3d.style.width = width + 'px';
+            room3d.style.height = height + 'px';
+            
+            // Adjust furniture positions if they're now outside the room
+            const furniture = roomFloor.querySelectorAll('.placed-furniture');
+            furniture.forEach(item => {
+                const currentX = parseInt(item.style.left);
+                const currentY = parseInt(item.style.top);
+                
+                const newX = Math.min(currentX, width - item.offsetWidth - 10);
+                const newY = Math.min(currentY, height - item.offsetHeight - 10);
+                
+                item.style.left = Math.max(10, newX) + 'px';
+                item.style.top = Math.max(10, newY) + 'px';
             });
         }
-        return vertices;
-    }
 
-    function checkCollision(obj1, obj2) {
-        const v1 = getVertices(obj1); const v2 = getVertices(obj2);
-        const axes = [v1[0].x-v1[1].x, v1[0].y-v1[1].y, v1[1].x-v1[2].x, v1[1].y-v1[2].y, v2[0].x-v2[1].x, v2[0].y-v2[1].y, v2[1].x-v2[2].x, v2[1].y-v2[2].y].map((val,i,arr)=>i%2===0?{x:-arr[i+1],y:val}:null).filter(v=>v);
-        for(let axis of axes) {
-            let p1 = v1.map(v => v.x*axis.x + v.y*axis.y);
-            let p2 = v2.map(v => v.x*axis.x + v.y*axis.y);
-            let [min1, max1] = [Math.min(...p1), Math.max(...p1)];
-            let [min2, max2] = [Math.min(...p2), Math.max(...p2)];
-            if(max1 < min2 || max2 < min1) return false;
+        // View controls
+        function setupViewControls() {
+            // Additional view setup can be added here
         }
-        return true;
-    }
 
-    function isOverlapping(movingObj, potentialState) {
-        const clone = movingObj.cloneNode(false);
-        clone.style.left = `${potentialState.x}px`; clone.style.top = `${potentialState.y}px`;
-        clone.style.width = `${potentialState.width}px`; clone.style.height = `${potentialState.height}px`;
-        clone.style.transform = `rotate(${potentialState.rotation}deg)`;
-        const otherObjects = [...roomContainer.querySelectorAll('.furniture')].filter(child => child.id !== movingObj.id);
-        for (let other of otherObjects) {
-            if (checkCollision(clone, other)) return true;
-        }
-        return false;
-    }
-
-    // --- INITIALIZATION ---
-    function populateSidebar() {
-        [furnitureList, architecturalList].forEach(list => list.innerHTML = '');
-        const createSidebarItem = (item) => {
-            const div = document.createElement('div');
-            div.className = 'bg-gray-100 p-2 rounded-lg hover:bg-blue-100 cursor-grab flex flex-col items-center space-y-2';
-            div.draggable = true;
-            div.dataset.item = JSON.stringify(item);
-            div.innerHTML = `<img src="${item.image}" class="w-24 h-24 object-contain" draggable="false"><span class="font-semibold text-sm">${item.name}</span>`;
-            div.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', e.currentTarget.dataset.item));
-            return div;
-        };
-        furnitureCatalog.forEach(item => furnitureList.appendChild(createSidebarItem(item)));
-        architecturalCatalog.forEach(item => architecturalList.appendChild(createSidebarItem(item)));
-    }
-
-    // --- OBJECT/FEATURE CREATION ---
-    function createFurnitureObject(itemData, pos) {
-        objectCounter++;
-        const obj = document.createElement('div');
-        obj.id = `object-${objectCounter}`;
-        obj.className = 'furniture';
-        obj.style.left = `${pos.x}px`; obj.style.top = `${pos.y}px`;
-        obj.style.width = `${itemData.width}px`; obj.style.height = `${itemData.height}px`;
-        obj.style.transform = `rotate(${pos.rotation || 0}deg)`;
-        obj.dataset.name = itemData.name; obj.dataset.zHeight = itemData.zHeight;
-        obj.innerHTML = `<img src="${itemData.image}" class="w-full h-full pointer-events-none"><div class="handle resize-handle"></div><div class="handle rotate-handle"></div><div class="dimension-display"></div>`;
-        roomContainer.appendChild(obj);
-        addFurnitureEventListeners(obj);
-        updateFurnitureDimensionLabel(obj);
-        selectObject(obj);
-    }
-
-    function createWallFeature(type, options = {}) {
-        objectCounter++;
-        const feature = document.createElement('div');
-        feature.id = `object-${objectCounter}`; feature.className = `wall-feature ${type}`;
-        feature.dataset.name = type;
-        const wall = options.wall || 'top';
-        const catalogItem = architecturalCatalog.find(item => item.type === type);
-        const size = options.size || catalogItem.width;
-        let position = options.position || 100;
-        feature.dataset.wall = wall;
-        feature.dataset.openingHeight = options.openingHeight || catalogItem.openingHeight;
-        if (type === 'window') feature.dataset.heightFromGround = options.heightFromGround || 90;
-
-        const wallThickness = 10;
-        if (wall === 'top' || wall === 'bottom') {
-            feature.style.width = `${size}px`; feature.style.height = `${wallThickness}px`;
-            position = Math.max(0, Math.min(position, roomContainer.offsetWidth - size));
-            feature.style.left = `${position}px`;
-            feature.style.top = wall === 'top' ? `-${wallThickness/2}px` : `${roomContainer.offsetHeight - wallThickness/2}px`;
-        } else {
-            feature.classList.add('on-vertical-wall');
-            feature.style.height = `${size}px`; feature.style.width = `${wallThickness}px`;
-            position = Math.max(0, Math.min(position, roomContainer.offsetHeight - size));
-            feature.style.top = `${position}px`;
-            feature.style.left = wall === 'left' ? `-${wallThickness/2}px` : `${roomContainer.offsetWidth - wallThickness/2}px`;
-        }
-        feature.innerHTML = `<div class="dimension-display"></div>`;
-        roomContainer.appendChild(feature);
-        addWallFeatureEventListeners(feature);
-        updateWallFeatureDimensionLabel(feature);
-        selectObject(feature);
-    }
-    
-    // --- EVENT LISTENERS ---
-    function addFurnitureEventListeners(obj) {
-        const rotateHandle = obj.querySelector('.rotate-handle');
-        const resizeHandle = obj.querySelector('.resize-handle');
-
-        obj.addEventListener('mousedown', e => {
-            if (e.target.classList.contains('furniture')) {
-                selectObject(obj);
-                let isDragging = true;
-                const startMouseX = e.clientX; const startMouseY = e.clientY;
-                const startCenterX = obj.offsetLeft + obj.offsetWidth / 2;
-                const startCenterY = obj.offsetTop + obj.offsetHeight / 2;
-                document.body.style.cursor = 'move'; e.stopPropagation();
-
-                function dragMove(e) {
-                    if (!isDragging) return;
-                    let newCenterX = startCenterX + (e.clientX - startMouseX);
-                    let newCenterY = startCenterY + (e.clientY - startMouseY);
-                    const angleRad = getRotationAngle(obj) * Math.PI / 180;
-                    const w = obj.offsetWidth; const h = obj.offsetHeight;
-                    const rotatedHalfWidth = (Math.abs(Math.cos(angleRad))*w + Math.abs(Math.sin(angleRad))*h) / 2;
-                    const rotatedHalfHeight = (Math.abs(Math.sin(angleRad))*w + Math.abs(Math.cos(angleRad))*h) / 2;
-                    newCenterX = Math.max(rotatedHalfWidth, Math.min(newCenterX, roomContainer.offsetWidth - rotatedHalfWidth));
-                    newCenterY = Math.max(rotatedHalfHeight, Math.min(newCenterY, roomContainer.offsetHeight - rotatedHalfHeight));
-                    const potentialState = {x:newCenterX-w/2, y:newCenterY-h/2, width:w, height:h, rotation:getRotationAngle(obj)};
-                    if (!isOverlapping(obj, potentialState)) {
-                        obj.style.left = `${potentialState.x}px`; obj.style.top = `${potentialState.y}px`;
-                        obj.classList.remove('colliding');
-                    } else {
-                        obj.classList.add('colliding');
-                    }
-                }
-                function dragEnd() {
-                    isDragging = false; obj.classList.remove('colliding');
-                    document.body.style.cursor = 'default';
-                    document.removeEventListener('mousemove', dragMove);
-                    document.removeEventListener('mouseup', dragEnd);
-                }
-                document.addEventListener('mousemove', dragMove);
-                document.addEventListener('mouseup', dragEnd);
-            }
-        });
-
-        resizeHandle.addEventListener('mousedown', e => {
-            e.stopPropagation(); selectObject(obj);
-            let isResizing = true;
-            const startWidth = obj.offsetWidth; const startHeight = obj.offsetHeight;
-            const startMouseX = e.clientX; const startMouseY = e.clientY;
+        function setView(viewType) {
+            const room3d = document.getElementById('room3d');
+            const buttons = document.querySelectorAll('.view-btn');
             
-            function resizeMove(e) {
-                if (!isResizing) return;
-                const newWidth = startWidth + (e.clientX - startMouseX);
-                const newHeight = startHeight + (e.clientY - startMouseY);
-                const potentialState = {x:obj.offsetLeft, y:obj.offsetTop, width:newWidth, height:newHeight, rotation:getRotationAngle(obj)};
-                if (!isOverlapping(obj, potentialState)) {
-                    obj.style.width = `${Math.max(20, newWidth)}px`; obj.style.height = `${Math.max(20, newHeight)}px`;
-                    updateFurnitureDimensionLabel(obj); obj.classList.remove('colliding');
-                } else {
-                    obj.classList.add('colliding');
-                }
-            }
-            function resizeEnd() {
-                isResizing = false; obj.classList.remove('colliding');
-                document.removeEventListener('mousemove', resizeMove);
-                document.removeEventListener('mouseup', resizeEnd);
-            }
-            document.addEventListener('mousemove', resizeMove);
-            document.addEventListener('mouseup', resizeEnd);
-        });
-
-        rotateHandle.addEventListener('mousedown', e => {
-            e.stopPropagation(); selectObject(obj);
-            let isRotating = true;
-            const rect = obj.getBoundingClientRect();
-            const objectCenterX = rect.left + rect.width/2; const objectCenterY = rect.top + rect.height/2;
-            const startAngle = getRotationAngle(obj);
-            const startMouseAngle = Math.atan2(e.clientY-objectCenterY, e.clientX-objectCenterX) * (180/Math.PI);
-
-            function rotateMove(e) {
-                if (!isRotating) return;
-                const currentMouseAngle = Math.atan2(e.clientY-objectCenterY, e.clientX-objectCenterX) * (180/Math.PI);
-                const rawRotation = startAngle + (currentMouseAngle - startMouseAngle);
-                let finalRotation = rawRotation; let isSnapped = false;
-                for (let angle of [0, 90, 180, 270, 360, -90, -180, -270]) {
-                    if (Math.abs(rawRotation - angle) < 10) {
-                        finalRotation = angle % 360; isSnapped = true; break;
-                    }
-                }
-                const potentialState = {x:obj.offsetLeft, y:obj.offsetTop, width:obj.offsetWidth, height:obj.offsetHeight, rotation:finalRotation};
-                if (!isOverlapping(obj, potentialState)) {
-                    rotateHandle.classList.toggle('snapped', isSnapped);
-                    obj.style.transform = `rotate(${finalRotation}deg)`;
-                    updateFurnitureDimensionLabel(obj);
-                    obj.classList.remove('colliding');
-                } else {
-                    obj.classList.add('colliding');
-                }
-            }
-            function rotateEnd() {
-                isRotating = false; rotateHandle.classList.remove('snapped'); obj.classList.remove('colliding');
-                document.removeEventListener('mousemove', rotateMove);
-                document.removeEventListener('mouseup', rotateEnd);
-            }
-            document.addEventListener('mousemove', rotateMove);
-            document.addEventListener('mouseup', rotateEnd);
-        });
-    }
-
-    function addWallFeatureEventListeners(obj) {
-        let action = null;
-        let startMousePos, startObjPos, startSize;
-        const isVertical = obj.classList.contains('on-vertical-wall');
-
-        obj.addEventListener('mousemove', e => {
-            if (action) return;
-            const rect = obj.getBoundingClientRect();
-            const clickPos = isVertical ? e.clientY : e.clientX;
-            const startEdge = isVertical ? rect.top : rect.left;
-            const endEdge = isVertical ? rect.bottom : rect.right;
-            obj.style.cursor = (Math.abs(clickPos - startEdge) < 10 || Math.abs(clickPos - endEdge) < 10) ? (isVertical ? 'ns-resize' : 'ew-resize') : 'move';
-        });
-
-        obj.addEventListener('mousedown', e => {
-            e.stopPropagation(); selectObject(obj);
-            const rect = obj.getBoundingClientRect();
-            const clickPos = isVertical ? e.clientY : e.clientX;
-            const startEdge = isVertical ? rect.top : rect.left;
-            const endEdge = isVertical ? rect.bottom : rect.right;
-            if (Math.abs(clickPos - startEdge) < 10) action = 'resize-start';
-            else if (Math.abs(clickPos - endEdge) < 10) action = 'resize-end';
-            else action = 'drag';
-            startMousePos = isVertical ? e.clientY : e.clientX;
-            startObjPos = isVertical ? obj.offsetTop : obj.offsetLeft;
-            startSize = isVertical ? obj.offsetHeight : obj.offsetWidth;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-
-        function onMouseMove(e) {
-            if (!action) return;
-            e.preventDefault();
-            const currentMousePos = isVertical ? e.clientY : e.clientX;
-            const delta = currentMousePos - startMousePos;
-
-            if (action === 'drag') {
-                if (isVertical) {
-                    let newTop = startObjPos + delta;
-                    newTop = Math.max(0, Math.min(newTop, roomContainer.offsetHeight - obj.offsetHeight));
-                    obj.style.top = `${newTop}px`;
-                } else {
-                    let newLeft = startObjPos + delta;
-                    newLeft = Math.max(0, Math.min(newLeft, roomContainer.offsetWidth - obj.offsetWidth));
-                    obj.style.left = `${newLeft}px`;
-                }
-            } else { // Resizing
-                if (isVertical) {
-                    if (action === 'resize-start') {
-                        const newHeight = startSize - delta;
-                        if (newHeight > 30) {
-                            obj.style.height = `${newHeight}px`;
-                            obj.style.top = `${startObjPos + delta}px`;
-                        }
-                    } else { // resize-end
-                        const newHeight = startSize + delta;
-                        if (newHeight > 30) obj.style.height = `${newHeight}px`;
-                    }
-                } else { // Horizontal
-                    if (action === 'resize-start') {
-                        const newWidth = startSize - delta;
-                        if (newWidth > 30) {
-                            obj.style.width = `${newWidth}px`;
-                            obj.style.left = `${startObjPos + delta}px`;
-                        }
-                    } else { // resize-end
-                        const newWidth = startSize + delta;
-                        if (newWidth > 30) obj.style.width = `${newWidth}px`;
-                    }
-                }
-                updateWallFeatureDimensionLabel(obj);
+            // Remove active class from all buttons
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+            
+            currentView = viewType;
+            
+            switch(viewType) {
+                case 'isometric':
+                    room3d.style.transform = 'rotateX(60deg) rotateY(0deg) rotateZ(45deg) translateZ(0px)';
+                    break;
+                case 'top':
+                    room3d.style.transform = 'rotateX(0deg) rotateY(0deg) rotateZ(0deg) translateZ(-300px) translateY(-165px)';
+                    break;
             }
         }
-        function onMouseUp() { action = null; document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }
-    }
-    
-    // --- ROOM RESIZING ---
-    function addRoomResizeListener(handle, position) {
-        handle.addEventListener('mousedown', e => {
-            e.stopPropagation(); let isResizing = true;
-            const startX = e.clientX; const startY = e.clientY;
-            const startWidth = roomContainer.offsetWidth; const startHeight = roomContainer.offsetHeight;
-            document.body.style.cursor = handle.style.cursor;
-            function resizeMove(e) {
-                if (!isResizing) return;
-                const dx = e.clientX - startX; const dy = e.clientY - startY;
-                let newWidth = startWidth, newHeight = startHeight;
-                if (position.includes('right')) newWidth += dx;
-                if (position.includes('left')) newWidth -= dx;
-                if (position.includes('bottom')) newHeight += dy;
-                if (position.includes('top')) newHeight -= dy;
-                roomContainer.style.width = `${Math.max(200, newWidth)}px`;
-                roomContainer.style.height = `${Math.max(200, newHeight)}px`;
-                updateRoomDimensions();
-                updateWallFeaturesPosition();
-            }
-            function resizeEnd() {
-                isResizing = false; document.body.style.cursor = 'default';
-                document.removeEventListener('mousemove', resizeMove);
-                document.removeEventListener('mouseup', resizeEnd);
-            }
-            document.addEventListener('mousemove', resizeMove);
-            document.addEventListener('mouseup', resizeEnd);
-        });
-    }
 
-    function updateWallFeaturesPosition() {
-        roomContainer.querySelectorAll('.wall-feature').forEach(obj => {
-            const wall = obj.dataset.wall;
-            const isVertical = obj.classList.contains('on-vertical-wall');
-            if (wall === 'bottom') obj.style.top = `${roomContainer.offsetHeight - 5}px`;
-            else if (wall === 'right') obj.style.left = `${roomContainer.offsetWidth - 5}px`;
-            if (!isVertical) {
-                const maxLeft = roomContainer.offsetWidth - obj.offsetWidth;
-                if (obj.offsetLeft > maxLeft) obj.style.left = `${maxLeft}px`;
-            } else {
-                const maxTop = roomContainer.offsetHeight - obj.offsetHeight;
-                if (obj.offsetTop > maxTop) obj.style.top = `${maxTop}px`;
+        // Floor texture changes
+        function changeFloorTexture() {
+            const floorTexture = document.getElementById('floorTexture').value;
+            const roomFloor = document.getElementById('roomFloor');
+            
+            switch(floorTexture) {
+                case 'tiles':
+                    roomFloor.style.background = `
+                        linear-gradient(45deg, 
+                            rgba(236, 240, 241, 0.9) 25%, 
+                            rgba(189, 195, 199, 0.1) 25%, 
+                            rgba(189, 195, 199, 0.1) 50%, 
+                            rgba(236, 240, 241, 0.9) 50%, 
+                            rgba(236, 240, 241, 0.9) 75%, 
+                            rgba(189, 195, 199, 0.1) 75%
+                        )`;
+                    roomFloor.style.backgroundSize = '40px 40px';
+                    break;
+                case 'wood':
+                    roomFloor.style.background = `
+                        linear-gradient(90deg, 
+                            rgba(160, 82, 45, 0.8) 0%, 
+                            rgba(210, 180, 140, 0.8) 25%, 
+                            rgba(139, 69, 19, 0.8) 50%, 
+                            rgba(205, 133, 63, 0.8) 75%, 
+                            rgba(160, 82, 45, 0.8) 100%
+                        )`;
+                    roomFloor.style.backgroundSize = '120px 20px';
+                    break;
+                case 'carpet':
+                    roomFloor.style.background = `
+                        radial-gradient(circle, 
+                            rgba(220, 20, 60, 0.3) 1px, 
+                            rgba(139, 0, 139, 0.2) 1px, 
+                            rgba(139, 0, 139, 0.2) 3px, 
+                            transparent 3px
+                        )`;
+                    roomFloor.style.backgroundSize = '20px 20px';
+                    break;
+                case 'marble':
+                    roomFloor.style.background = `
+                        linear-gradient(45deg, 
+                            rgba(248, 248, 255, 0.9) 25%, 
+                            rgba(230, 230, 250, 0.7) 25%, 
+                            rgba(230, 230, 250, 0.7) 50%, 
+                            rgba(248, 248, 255, 0.9) 50%, 
+                            rgba(248, 248, 255, 0.9) 75%, 
+                            rgba(211, 211, 211, 0.5) 75%
+                        )`;
+                    roomFloor.style.backgroundSize = '60px 60px';
+                    break;
             }
-        });
-    }
-
-    // --- SELECTION & UI ---
-    function selectObject(obj) {
-        if (selectedObject) selectedObject.classList.remove('selected');
-        selectedObject = obj;
-        contextualSettings.innerHTML = '';
-        if (!obj) {
-            deleteBtn.disabled = true;
-            return;
         }
-        selectedObject.classList.add('selected');
-        deleteBtn.disabled = false;
-        if (obj.classList.contains('furniture')) {
-            contextualSettings.innerHTML = `<label for="cs-height" class="text-sm">Height(cm):</label><input type="number" id="cs-height" class="w-20 border-gray-300 rounded-md shadow-sm text-sm" value="${obj.dataset.zHeight}"><button id="cs-set-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Set</button>`;
-            document.getElementById('cs-set-height').addEventListener('click', () => { obj.dataset.zHeight = document.getElementById('cs-height').value; updateFurnitureDimensionLabel(obj); });
-        } else if (obj.classList.contains('window')) {
-            contextualSettings.innerHTML = `<label for="cs-sill" class="text-sm">Sill(cm):</label><input type="number" id="cs-sill" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.heightFromGround}"><label for="cs-o-height" class="text-sm">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.openingHeight}">`;
-            document.getElementById('cs-sill').addEventListener('change', e => { obj.dataset.heightFromGround = e.target.value; updateWallFeatureDimensionLabel(obj); });
-            document.getElementById('cs-o-height').addEventListener('change', e => { obj.dataset.openingHeight = e.target.value; updateWallFeatureDimensionLabel(obj); });
-        } else if (obj.classList.contains('door')) {
-            contextualSettings.innerHTML = `<label for="cs-o-height" class="text-sm">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.openingHeight}"><button id="cs-set-o-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">Set</button>`;
-            document.getElementById('cs-set-o-height').addEventListener('click', () => { obj.dataset.openingHeight = document.getElementById('cs-o-height').value; updateWallFeatureDimensionLabel(obj); });
+
+        // Utility functions
+        function updateItemCount() {
+            const count = document.querySelectorAll('.placed-furniture').length;
+            document.getElementById('itemCount').textContent = count;
         }
-    }
-    const deselectAll = () => selectObject(null);
 
-    // --- DRAG & DROP ---
-    function findClosestWall(x, y, roomWidth, roomHeight) {
-        const dists = { top: y, bottom: roomHeight - y, left: x, right: roomWidth - x };
-        const closest = Object.keys(dists).reduce((a, b) => dists[a] < dists[b] ? a : b);
-        let position = (closest === 'top' || closest === 'bottom') ? x : y;
-        return { name: closest, position: position };
-    }
-
-    function handleDrop(e) {
-        e.preventDefault();
-        const itemData = JSON.parse(e.dataTransfer.getData('text/plain'));
-        const roomRect = roomContainer.getBoundingClientRect();
-        const x = e.clientX - roomRect.left; const y = e.clientY - roomRect.top;
-        if (itemData.type === 'door' || itemData.type === 'window') {
-            const closestWall = findClosestWall(x, y, roomContainer.offsetWidth, roomContainer.offsetHeight);
-            createWallFeature(itemData.type, { wall: closestWall.name, position: closestWall.position - (itemData.width / 2) });
-        } else {
-            const pos = { x: x - (itemData.width / 2), y: y - (itemData.height / 2) };
-            const dummy = document.createElement('div'); dummy.id = 'dummy';
-            if (!isOverlapping(dummy, { ...pos, width: itemData.width, height: itemData.height, rotation: 0 })) {
-                createFurnitureObject(itemData, pos);
-            } else { console.warn("Cannot place object here: Overlap detected."); }
-        }
-    }
-
-    // --- SAVE/LOAD ---
-    function saveLayout() {
-        const layoutData = { room: { width: roomContainer.offsetWidth, height: roomContainer.offsetHeight }, furniture: [], openings: [] };
-        roomContainer.querySelectorAll('.furniture').forEach(obj => { layoutData.furniture.push({ name: obj.dataset.name, x: obj.offsetLeft, y: obj.offsetTop, width: obj.offsetWidth, height: obj.offsetHeight, zHeight: obj.dataset.zHeight, rotation: getRotationAngle(obj) }); });
-        roomContainer.querySelectorAll('.wall-feature').forEach(obj => {
-            const isVertical = obj.classList.contains('on-vertical-wall');
-            const opening = { type: obj.dataset.name, wall: obj.dataset.wall, position: isVertical ? obj.offsetTop : obj.offsetLeft, size: isVertical ? obj.offsetHeight : obj.offsetWidth, openingHeight: obj.dataset.openingHeight };
-            if (opening.type === 'window') opening.heightFromGround = obj.dataset.heightFromGround;
-            layoutData.openings.push(opening);
-        });
-        const blob = new Blob([JSON.stringify(layoutData, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-        a.download = 'room-layout.json'; a.click();
-        URL.revokeObjectURL(a.href);
-    }
-    
-    function buildLayoutFromJSON(data) {
-        deselectAll(); canvas.innerHTML = '';
-        initializeApp(data.room.width, data.room.height);
-        (data.openings || []).forEach(o => createWallFeature(o.type, o));
-        (data.furniture || []).forEach(f => {
-            const catalogItem = furnitureCatalog.find(item => item.name === f.name);
-            if (catalogItem) {
-                const itemData = { ...catalogItem, width: f.width, height: f.height, zHeight: f.zHeight };
-                const pos = { x: f.x, y: f.y, rotation: f.rotation };
-                createFurnitureObject(itemData, pos);
+        function clearRoom() {
+            if (confirm('🗑️ Clear all furniture from the room?')) {
+                const furniture = document.querySelectorAll('.placed-furniture');
+                furniture.forEach((item, index) => {
+                    setTimeout(() => {
+                        item.style.transform = 'scale(0) rotateY(360deg) translateZ(-200px)';
+                        item.style.opacity = '0';
+                        setTimeout(() => item.remove(), 400);
+                    }, index * 100);
+                });
+                setTimeout(updateItemCount, furniture.length * 100 + 400);
             }
-        });
-        deselectAll();
-    }
+        }
 
-    // --- INITIALIZE APP ---
-    function initializeApp(width = 800, height = 600) {
-        canvas.innerHTML = '';
-        roomContainer = document.createElement('div');
-        roomContainer.id = 'room-container';
-        roomContainer.style.width = `${width}px`; roomContainer.style.height = `${height}px`;
-        canvas.appendChild(roomContainer);
-        const roomDimDisplay = document.createElement('div');
-        roomDimDisplay.className = 'dimension-display room-dimension';
-        roomContainer.appendChild(roomDimDisplay);
-        updateRoomDimensions();
-        ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach(pos => {
-            const handle = document.createElement('div');
-            handle.className = `handle room-handle ${pos}`;
-            roomContainer.appendChild(handle);
-            addRoomResizeListener(handle, pos);
-        });
-        roomContainer.addEventListener('dragover', e => e.preventDefault());
-        roomContainer.addEventListener('drop', handleDrop);
-    }
+        function randomLayout() {
+            const furnitureTypes = ['bed', 'wardrobe', 'study-table', 'study-chair', 'sofa', 'bedside-table'];
+            const room = document.getElementById('roomFloor');
+            
+            // Clear existing furniture first
+            document.querySelectorAll('.placed-furniture').forEach(item => item.remove());
+            
+            // Add random furniture
+            const numItems = Math.floor(Math.random() * 4) + 3; // 3-6 items
+            
+            for (let i = 0; i < numItems; i++) {
+                setTimeout(() => {
+                    const randomType = furnitureTypes[Math.floor(Math.random() * furnitureTypes.length)];
+                    const x = Math.random() * (room.clientWidth - 150) + 20;
+                    const y = Math.random() * (room.clientHeight - 100) + 20;
+                    
+                    createFurniture3D(randomType, x, y);
+                }, i * 300);
+            }
+        }
 
-    // --- BIND TOP-LEVEL EVENT LISTENERS ---
-    deleteBtn.addEventListener('click', () => { if (selectedObject) { selectedObject.remove(); deselectAll(); } });
-    canvas.addEventListener('click', e => { if (e.target.id === 'canvas' || e.target.id === 'room-container') deselectAll(); });
-    loadBtn.addEventListener('click', () => loadLayoutInput.click());
-    loadLayoutInput.addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (re) => {
-                try { buildLayoutFromJSON(JSON.parse(re.target.result)); }
-                catch(err) { alert('Error: Could not load layout from file.'); console.error(err); }
+        function saveLayout() {
+            const furniture = [];
+            document.querySelectorAll('.placed-furniture').forEach(item => {
+                const classList = Array.from(item.classList);
+                const type = classList.find(cls => cls !== 'placed-furniture');
+                
+                furniture.push({
+                    type: type,
+                    x: parseInt(item.style.left),
+                    y: parseInt(item.style.top),
+                    id: item.id
+                });
+            });
+            
+            const layout = {
+                furniture: furniture,
+                roomWidth: document.getElementById('roomWidth').value,
+                roomHeight: document.getElementById('roomHeight').value,
+                floorTexture: document.getElementById('floorTexture').value,
+                view: currentView,
+                timestamp: new Date().toISOString(),
+                version: "3D Room Planner v1.0"
             };
-            reader.readAsText(file);
-            e.target.value = null;
+            
+            const dataStr = JSON.stringify(layout, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `room_design_${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+            
+            // Show success message
+            showNotification('💾 Design saved successfully!', 'success');
         }
-    });
-    saveBtn.addEventListener('click', saveLayout);
-    toggleDimsSwitch.addEventListener('change', () => document.body.classList.toggle('hide-dims', !toggleDimsSwitch.checked));
-    
-    // --- APP START ---
-    populateSidebar();
-    initializeApp();
-});
+
+        function loadLayout() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const layout = JSON.parse(e.target.result);
+                        
+                        // Clear existing furniture
+                        document.querySelectorAll('.placed-furniture').forEach(item => item.remove());
+                        
+                        // Set room properties
+                        document.getElementById('roomWidth').value = layout.roomWidth;
+                        document.getElementById('roomHeight').value = layout.roomHeight;
+                        document.getElementById('floorTexture').value = layout.floorTexture || 'tiles';
+                        
+                        updateRoomSize();
+                        changeFloorTexture();
+                        
+                        // Set view if available
+                        if (layout.view) {
+                            setView(layout.view);
+                        }
+                        
+                        // Add furniture with delay for smooth animation
+                        furnitureCounter = 0;
+                        layout.furniture.forEach((item, index) => {
+                            setTimeout(() => {
+                                createFurniture3D(item.type, item.x, item.y);
+                            }, index * 200);
+                        });
+                        
+                        showNotification('📂 Design loaded successfully!', 'success');
+                    } catch (error) {
+                        showNotification('❌ Error loading design: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+
+        function exportImage() {
+            showNotification('📸 Screenshot feature coming soon! Use browser screenshot for now.', 'info');
+        }
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                border-radius: 10px;
+                color: white;
+                font-weight: bold;
+                z-index: 10000;
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+                max-width: 300px;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            `;
+            
+            switch(type) {
+                case 'success':
+                    notification.style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
+                    break;
+                case 'error':
+                    notification.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+                    break;
+                default:
+                    notification.style.background = 'linear-gradient(45deg, #3498db, #2c3e50)';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Slide in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Slide out and remove
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize the application when the page loads
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Prevent context menu on furniture items
+        document.addEventListener('contextmenu', function(e) {
+            if (e.target.closest('.placed-furniture')) {
+                e.preventDefault();
+            }
+        });
+
+        // Add some keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Delete' && selectedElement) {
+                handleDoubleClick({ preventDefault: () => {}, currentTarget: selectedElement });
+            }
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveLayout();
+            }
+            if (e.ctrlKey && e.key === 'o') {
+                e.preventDefault();
+                loadLayout();
+            }
+            if (e.key === 'Escape') {
+                if (selectedElement) {
+                    selectedElement.classList.remove('selected');
+                    selectedElement = null;
+                }
+            }
+        });
