@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // --- DOM ELEMENTS ---
     const furnitureList = document.getElementById('furniture-list');
     const architecturalList = document.getElementById('architectural-list');
@@ -14,20 +14,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE ---
     let selectedObject = null;
     let objectCounter = 0;
+    const furnitureRatios = {}; // Precomputed ratios for accurate drop/fit
 
     // --- CATALOGS ---
     const furnitureCatalog = [
-        { name: 'Sofa', image: '/static/images/sofa.svg', width: 200, height: 90, zHeight: 85 },
-        { name: 'Study Table', image: '/static/images/study_table.svg', width: 120, height: 70, zHeight: 75 },
-        { name: 'Study Chair', image: '/static/images/study_chair.svg', width: 50, height: 50, zHeight: 90 },
-        { name: 'Bed', image: '/static/images/bed.svg', width: 180, height: 200, zHeight: 55 },
-        { name: 'Wardrobe', image: '/static/images/wardrobe.svg', width: 150, height: 60, zHeight: 200 },
-        { name: 'Bedside Table', image: '/static/images/bedside_table.svg', width: 45, height: 45, zHeight: 60 },
+        { name: 'Sofa', image: '/static/images/sofa.png', width: 200, height: 120, zHeight: 85 },
+        { name: 'Study Table', image: '/static/images/study_table.png', width: 120, height: 70, zHeight: 75 },
+        { name: 'Study Chair', image: '/static/images/study_chair.png', width: 50, height: 50, zHeight: 90 },
+        { name: 'Bed', image: '/static/images/bed.png', width: 180, height: 200, zHeight: 55 },
+        { name: 'Wardrobe', image: '/static/images/wardrobe.png', width: 150, height: 60, zHeight: 200 },
+        { name: 'Bedside Table', image: '/static/images/bedside_table.png', width: 45, height: 45, zHeight: 60 },
     ];
     const architecturalCatalog = [
-        { name: 'Door', type: 'door', image: '/static/images/door.svg', width: 90, openingHeight: 210 },
-        { name: 'Window', type: 'window', image: '/static/images/window.svg', width: 120, openingHeight: 100 }
+        { name: 'Door', type: 'door', image: '/static/images/door.png', width: 90, openingHeight: 210 },
+        { name: 'Window', type: 'window', image: '/static/images/window.png', width: 120, openingHeight: 100 }
     ];
+
+    // --- PRECOMPUTE RATIOS ---
+    async function precomputeRatios() {
+        const promises = furnitureCatalog.map(item => new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                furnitureRatios[item.name] = img.naturalHeight / img.naturalWidth;
+                resolve();
+            };
+            img.onerror = () => {
+                furnitureRatios[item.name] = item.height / item.width; // Fallback
+                resolve();
+            };
+            img.src = item.image;
+        }));
+        await Promise.all(promises);
+    }
 
     // --- HELPER & UTILITY FUNCTIONS ---
     const getRotationAngle = (obj) => {
@@ -40,6 +58,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dimDisplay) return;
         const angle = getRotationAngle(obj);
         dimDisplay.textContent = `${obj.offsetWidth}x${obj.offsetHeight}x${obj.dataset.zHeight} cm (${Math.round(angle)}°)`;
+    };
+
+    const adjustToImageRatio = (obj, baseWidth) => {
+        const img = obj.querySelector('img');
+        if (!img.naturalWidth) return; // Safety check
+        const ratio = img.naturalHeight / img.naturalWidth;
+        const newHeight = baseWidth * ratio;
+        const oldHeight = parseFloat(obj.style.height) || baseWidth; // Fallback to base if no style set
+        obj.style.height = `${newHeight}px`;
+        
+        // Adjust top position to keep the visual center at the original drop point
+        const deltaHeight = (newHeight - oldHeight) / 2;
+        const currentTop = parseFloat(obj.style.top);
+        obj.style.top = `${currentTop + deltaHeight}px`;
+        
+        updateFurnitureDimensionLabel(obj);
     };
 
     const updateWallFeatureDimensionLabel = (obj) => {
@@ -118,19 +152,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- OBJECT/FEATURE CREATION ---
-    function createFurnitureObject(itemData, pos) {
+    function createFurnitureObject(itemData, pos, noAdjust = false) {
         objectCounter++;
         const obj = document.createElement('div');
         obj.id = `object-${objectCounter}`;
         obj.className = 'furniture';
-        obj.style.left = `${pos.x}px`; obj.style.top = `${pos.y}px`;
-        obj.style.width = `${itemData.width}px`; obj.style.height = `${itemData.height}px`;
+        obj.style.left = `${pos.x}px`;
+        obj.style.top = `${pos.y}px`;
+        obj.style.width = `${itemData.width}px`;
+        obj.style.height = `${itemData.height}px`; // Use passed (adjusted or custom) height
         obj.style.transform = `rotate(${pos.rotation || 0}deg)`;
-        obj.dataset.name = itemData.name; obj.dataset.zHeight = itemData.zHeight;
-        obj.innerHTML = `<img src="${itemData.image}" class="w-full h-full pointer-events-none"><div class="handle resize-handle"></div><div class="handle rotate-handle"></div><div class="dimension-display"></div>`;
+        obj.dataset.name = itemData.name;
+        obj.dataset.zHeight = itemData.zHeight;
+        
+        const img = document.createElement('img');
+        img.src = itemData.image;
+        img.className = 'w-full h-full object-contain pointer-events-none';
+        obj.appendChild(img);
+        
+        // Add handles and dimension display
+        obj.innerHTML += `<div class="handle resize-handle"></div><div class="handle rotate-handle"></div><div class="dimension-display"></div>`;
+        
         roomContainer.appendChild(obj);
         addFurnitureEventListeners(obj);
-        updateFurnitureDimensionLabel(obj);
+        
+        // Adjust only for new drops (confirms pre-fit; no-op if matched)
+        if (!noAdjust) {
+            if (img.complete) {
+                adjustToImageRatio(obj, itemData.width);
+            } else {
+                img.onload = () => adjustToImageRatio(obj, itemData.width);
+            }
+        } else {
+            updateFurnitureDimensionLabel(obj);
+        }
+        
         selectObject(obj);
     }
 
@@ -439,11 +495,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const closestWall = findClosestWall(x, y, roomContainer.offsetWidth, roomContainer.offsetHeight);
             createWallFeature(itemData.type, { wall: closestWall.name, position: closestWall.position - (itemData.width / 2) });
         } else {
-            const pos = { x: x - (itemData.width / 2), y: y - (itemData.height / 2) };
+            const ratio = furnitureRatios[itemData.name] || (itemData.height / itemData.width);
+            const adjustedHeight = itemData.width * ratio;
+            const originalHeight = itemData.height;
+            itemData.height = adjustedHeight; // Temp for accurate init/centering
+            const pos = { x: x - (itemData.width / 2), y: y - (adjustedHeight / 2) };
+            const checkState = { x: pos.x, y: pos.y, width: itemData.width, height: adjustedHeight, rotation: 0 };
             const dummy = document.createElement('div'); dummy.id = 'dummy';
-            if (!isOverlapping(dummy, { ...pos, width: itemData.width, height: itemData.height, rotation: 0 })) {
+            if (!isOverlapping(dummy, checkState)) {
                 createFurnitureObject(itemData, pos);
-            } else { console.warn("Cannot place object here: Overlap detected."); }
+            } else {
+                console.warn("Cannot place object here: Overlap detected.");
+            }
+            itemData.height = originalHeight; // Restore (not needed, but clean)
         }
     }
 
@@ -472,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (catalogItem) {
                 const itemData = { ...catalogItem, width: f.width, height: f.height, zHeight: f.zHeight };
                 const pos = { x: f.x, y: f.y, rotation: f.rotation };
-                createFurnitureObject(itemData, pos);
+                createFurnitureObject(itemData, pos, true); // Skip adjust to keep custom sizes
             }
         });
         deselectAll();
@@ -520,5 +584,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- APP START ---
     populateSidebar();
+    await precomputeRatios();
     initializeApp();
 });

@@ -1,0 +1,6 @@
+Bed Size - 160 x 200 x 55
+Study table Size - 120 x 80 x 75
+Sofa Size - 160 x 110 x 85
+Wardrobe Size - 150 x 60 x 200
+Study Chair Size - 50 x 50 x 42
+Bedside table Size - 60 x 60 x 60

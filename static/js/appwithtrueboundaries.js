@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let selectedObject = null;
     let objectCounter = 0;
     const furnitureRatios = {};
-    const furnitureBounds = {};
+    const furnitureBounds = {}; // Store computed bounds per item
 
     const furnitureCatalog = [
         { name: 'Bed', image: '/static/images/bed.png', width: 160, height: 200, zHeight: 55 },
@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         [furnitureList, architecturalList].forEach(list => list.innerHTML = '');
         const createSidebarItem = (item) => {
             const div = document.createElement('div');
-            div.className = 'bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab flex flex-col items-center shadow-sm border border-slate-700 transition hover:shadow-md hover:scale-105';
+            div.className = 'bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab flex flex-col items-center shadow-sm border border-slate-700 transition';
             div.draggable = true;
             div.dataset.item = JSON.stringify(item);
             const bounds = furnitureBounds[item.name] || { width: item.width, height: item.height };
@@ -202,9 +202,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const startHeight = obj.offsetHeight;
             const startMouseX = e.clientX;
             const startMouseY = e.clientY;
-            const img = obj.querySelector('img');
-            const startImgWidth = parseFloat(img.style.width) || img.naturalWidth;
-            const startImgHeight = parseFloat(img.style.height) || img.naturalHeight;
             function resizeMove(e) {
                 if (!isResizing) return;
                 const newWidth = startWidth + (e.clientX - startMouseX);
@@ -213,9 +210,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!isOverlapping(obj, potentialState)) {
                     obj.style.width = `${Math.max(20, newWidth)}px`;
                     obj.style.height = `${Math.max(20, newHeight)}px`;
-                    // Scale img dimensions independently, keep offsets fixed
-                    img.style.width = `${startImgWidth * (newWidth / startWidth)}px`;
-                    img.style.height = `${startImgHeight * (newHeight / startHeight)}px`;
+                    // Scale img offset proportionally
+                    const img = obj.querySelector('img');
+                    const scale = newWidth / startWidth;
+                    img.style.left = `${parseFloat(img.style.left || 0) * scale}px`;
+                    img.style.top = `${parseFloat(img.style.top || 0) * scale}px`;
                     updateFurnitureDimensionLabel(obj);
                     obj.classList.remove('colliding');
                 } else {
@@ -236,18 +235,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.stopPropagation();
             selectObject(obj);
             let isRotating = true;
-            const startAngle = getRotationAngle(obj);
-            const startMouseX = e.clientX;
-            const startMouseY = e.clientY;
             const rect = obj.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const startMouseAngle = Math.atan2(startMouseY - centerY, startMouseX - centerX) * (180 / Math.PI);
+            const objectCenterX = rect.left + rect.width / 2;
+            const objectCenterY = rect.top + rect.height / 2;
+            const startAngle = getRotationAngle(obj);
+            const startMouseAngle = Math.atan2(e.clientY - objectCenterY, e.clientX - objectCenterX) * (180 / Math.PI);
             function rotateMove(e) {
                 if (!isRotating) return;
-                const currentMouseX = e.clientX;
-                const currentMouseY = e.clientY;
-                const currentMouseAngle = Math.atan2(currentMouseY - centerY, currentMouseX - centerX) * (180 / Math.PI);
+                const currentMouseAngle = Math.atan2(e.clientY - objectCenterY, e.clientX - objectCenterX) * (180 / Math.PI);
                 const rawRotation = startAngle + (currentMouseAngle - startMouseAngle);
                 let finalRotation = rawRotation;
                 let isSnapped = false;
@@ -400,13 +395,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         selectedObject.classList.add('selected');
         deleteBtn.disabled = false;
         if (obj.classList.contains('furniture')) {
-            contextualSettings.innerHTML = `<label for="cs-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-height" class="w-20 border-gray-300 rounded-md shadow-sm text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.zHeight}"><button id="cs-set-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
+            contextualSettings.innerHTML = `<label for="cs-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-height" class="w-20 border-gray-300 rounded-md shadow-sm text-sm" value="${obj.dataset.zHeight}"><button id="cs-set-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2">Set</button>`;
             document.getElementById('cs-set-height').addEventListener('click', () => {
                 obj.dataset.zHeight = document.getElementById('cs-height').value;
                 updateFurnitureDimensionLabel(obj);
             });
         } else if (obj.classList.contains('window')) {
-            contextualSettings.innerHTML = `<label for="cs-sill" class="text-sm text-slate-200 mr-2">Sill(cm):</label><input type="number" id="cs-sill" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.heightFromGround}"><label for="cs-o-height" class="text-sm text-slate-200 ml-2 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.openingHeight}">`;
+            contextualSettings.innerHTML = `<label for="cs-sill" class="text-sm text-slate-200 mr-2">Sill(cm):</label><input type="number" id="cs-sill" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.heightFromGround}"><label for="cs-o-height" class="text-sm text-slate-200 ml-2 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.openingHeight}">`;
             document.getElementById('cs-sill').addEventListener('change', e => {
                 obj.dataset.heightFromGround = e.target.value;
                 updateWallFeatureDimensionLabel(obj);
@@ -416,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updateWallFeatureDimensionLabel(obj);
             });
         } else if (obj.classList.contains('door')) {
-            contextualSettings.innerHTML = `<label for="cs-o-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.openingHeight}"><button id="cs-set-o-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
+            contextualSettings.innerHTML = `<label for="cs-o-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm" value="${obj.dataset.openingHeight}"><button id="cs-set-o-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2">Set</button>`;
             document.getElementById('cs-set-o-height').addEventListener('click', () => {
                 obj.dataset.openingHeight = document.getElementById('cs-o-height').value;
                 updateWallFeatureDimensionLabel(obj);
@@ -458,20 +453,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Use precomputed bounds to set size and position
         const bounds = furnitureBounds[itemData.name];
         if (bounds) {
-            const scale = itemData.width / bounds.width;
+            const scale = itemData.width / bounds.width; // Scale to match standard width
             obj.style.width = `${itemData.width}px`;
             obj.style.height = `${bounds.height * scale}px`;
+            // Position img to crop to tight bounds
             img.style.width = `${img.naturalWidth * scale}px`;
             img.style.height = `${img.naturalHeight * scale}px`;
             img.style.left = `${-bounds.minX * scale}px`;
             img.style.top = `${-bounds.minY * scale}px`;
         } else {
+            // Fallback
             obj.style.width = `${itemData.width}px`;
             obj.style.height = `${itemData.height}px`;
         }
 
         img.onload = () => {
-            if (!bounds) {
+            if (!bounds) { // Recompute if not precomputed
                 const tempCanvas = document.createElement('canvas');
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCanvas.width = img.naturalWidth;
@@ -619,20 +616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function saveLayout() {
         const layoutData = { room: { width: roomContainer.offsetWidth, height: roomContainer.offsetHeight }, furniture: [], openings: [] };
         roomContainer.querySelectorAll('.furniture').forEach(obj => {
-            const img = obj.querySelector('img');
-            layoutData.furniture.push({ 
-                name: obj.dataset.name, 
-                x: obj.offsetLeft, 
-                y: obj.offsetTop, 
-                width: obj.offsetWidth, 
-                height: obj.offsetHeight, 
-                zHeight: obj.dataset.zHeight, 
-                rotation: getRotationAngle(obj),
-                imgLeft: img.style.left,
-                imgTop: img.style.top,
-                imgWidth: img.style.width,
-                imgHeight: img.style.height
-            });
+            layoutData.furniture.push({ name: obj.dataset.name, x: obj.offsetLeft, y: obj.offsetTop, width: obj.offsetWidth, height: obj.offsetHeight, zHeight: obj.dataset.zHeight, rotation: getRotationAngle(obj) });
         });
         roomContainer.querySelectorAll('.wall-feature').forEach(obj => {
             const isVertical = obj.classList.contains('on-vertical-wall');
@@ -653,23 +637,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         canvas.innerHTML = '';
         initializeApp(data.room.width, data.room.height);
         (data.openings || []).forEach(o => createWallFeature(o.type, o));
-        (data.furniture || []).forEach((f, index) => {
+        (data.furniture || []).forEach(f => {
             const catalogItem = furnitureCatalog.find(item => item.name === f.name);
             if (catalogItem) {
                 const itemData = { ...catalogItem, width: f.width, height: f.height, zHeight: f.zHeight };
                 const pos = { x: f.x, y: f.y, rotation: f.rotation };
                 createFurnitureObject(itemData, pos, true);
-                setTimeout(() => {
-                    const obj = roomContainer.querySelector(`[data-name="${f.name}"]:last-of-type`);
-                    if (obj) {
-                        const img = obj.querySelector('img');
-                        if (f.imgLeft) img.style.left = f.imgLeft;
-                        if (f.imgTop) img.style.top = f.imgTop;
-                        if (f.imgWidth) img.style.width = f.imgWidth;
-                        if (f.imgHeight) img.style.height = f.imgHeight;
-                        updateFurnitureDimensionLabel(obj);
-                    }
-                }, 100);
             }
         });
         deselectAll();
