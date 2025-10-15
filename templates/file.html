@@ -1,3 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan Your Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      font-family: "Inter", sans-serif;
+      font-weight: 400;
+    }
+
+    #canvas {
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 80%);
+      padding: 2rem;
+    }
+
+    #room-container {
+      background-color: #1e293b;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 2px #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      transform-origin: center center;
+    }
+
+    .furniture {
+      position: absolute;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background-color: rgba(255, 255, 255, 0.04);
+      cursor: move;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      transform-origin: center center;
+    }
+
+    .furniture.selected {
+      border: 2px solid #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.6), 0 4px 20px rgba(0,0,0,0.2);
+    }
+
+    .furniture img {
+      width: auto;
+      height: auto;
+      object-fit: fill;
+      border-radius: 6px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .colliding {
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.8), 0 4px 20px rgba(239, 68, 68, 0.2);
+    }
+
+    .handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background-color: #3b82f6;
+      border: 2px solid #0f172a;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 10;
+      pointer-events: auto;
+    }
+
+    .furniture.selected .handle {
+      opacity: 1;
+    }
+
+    .resize-handle {
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+    }
+
+    .rotate-handle {
+      top: -24px;
+      left: calc(50% - 6px);
+      cursor: grab;
+      width: 16px;
+      height: 16px;
+    }
+
+    .rotate-handle:hover {
+      background-color: #1d4ed8;
+    }
+
+    .rotate-handle.snapped {
+      background-color: #22c55e;
+    }
+
+    .room-handle {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: #475569;
+      border: 2px solid #94a3b8;
+      position: absolute;
+      transition: all 0.2s ease;
+    }
+
+    .room-handle:hover {
+      background-color: #3b82f6;
+      transform: scale(1.2);
+    }
+
+    .room-handle.top-left { top: -6px; left: -6px; cursor: nwse-resize; }
+    .room-handle.top-right { top: -6px; right: -6px; cursor: nesw-resize; }
+    .room-handle.bottom-left { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    .room-handle.bottom-right { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+    .wall-feature {
+      position: absolute;
+      cursor: move;
+      z-index: 5;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+      border-radius: 4px;
+    }
+
+    .wall-feature img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0.95;
+      pointer-events: none;
+    }
+
+    .wall-feature.selected {
+      box-shadow: 0 0 12px rgba(96, 165, 250, 0.8), 0 4px 20px rgba(0,0,0,0.2);
+      border-color: #93c5fd !important;
+    }
+
+    .dimension-display {
+      position: absolute;
+      bottom: -24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(30, 41, 59, 0.9);
+      color: #f1f5f9;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .room-dimension {
+      bottom: auto;
+      top: -24px;
+      right: 0;
+      left: auto;
+      transform: none;
+    }
+
+    #floating-sidebar {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 280px;
+      height: 80vh;
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      z-index: 1000;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+    }
+
+    #floating-sidebar.hidden {
+      transform: translateX(-320px);
+    }
+
+    #floating-sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-icon {
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      color: #94a3b8;
+      transition: color 0.2s;
+      cursor: pointer;
+    }
+
+    .sidebar-icon:hover {
+      color: #3b82f6;
+    }
+
+    .btn {
+      border-radius: 8px;
+      font-weight: 500;
+      padding: 0.75rem 1.25rem;
+      transition: all 0.2s ease;
+      font-family: "Inter", sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 14px;
+    }
+
+    #load-btn {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+    }
+    #load-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    #save-btn {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: white;
+    }
+    #save-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+    }
+
+    #delete-btn {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      color: white;
+    }
+    #delete-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+    }
+
+    #delete-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255,255,255,0.05);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      margin-left: auto;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #4b5563;
+      border-radius: 12px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: #3b82f6;
+      transform: translateX(20px);
+    }
+
+    .toggle-slider {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .hide-dims .dimension-display { opacity: 0; }
+
+    #toggle-sidebar {
+      z-index: 999;
+    }
+  </style>
+</head>
+<body class="font-sans bg-gray-900 text-gray-100">
+  <button id="toggle-sidebar" class="fixed top-4 left-4 btn bg-gray-800 text-white rounded-full p-2">
+    📋
+  </button>
+
+  <div id="floating-sidebar" class="hidden">
+    <div id="floating-sidebar-header">
+      <h1 class="text-xl font-bold">Catalog</h1>
+      <button class="sidebar-icon" id="close-sidebar">✕</button>
+    </div>
+    <div class="p-4 space-y-6 overflow-y-auto">
+      <div>
+        <h2 class="text-lg font-semibold border-b border-slate-700 pb-2">Furniture</h2>
+        <div id="furniture-list" class="space-y-4 mt-2 grid grid-cols-2 gap-2"></div>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold border-b border-slate-700 pb-2">Architectural</h2>
+        <div id="architectural-list" class="space-y-4 mt-2 grid grid-cols-2 gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <main class="flex-1 flex flex-col pt-4 pr-4">
+    <header class="flex justify-between items-center mb-4 p-4 bg-slate-800/50 rounded-lg">
+      <div class="flex items-center space-x-4">
+        <h1 class="text-xl font-bold">Room Planner</h1>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="toggle-container">
+          <span class="text-sm text-slate-300">Show Dims</span>
+          <label class="relative inline-flex items-center">
+            <input type="checkbox" id="toggle-dims-switch" class="sr-only peer" checked>
+            <div class="toggle-switch peer">
+              <div class="toggle-slider"></div>
+            </div>
+          </label>
+        </div>
+        <input type="file" id="load-layout-input" class="hidden" accept=".json">
+        <button id="load-btn" class="btn">Load</button>
+        <button id="save-btn" class="btn">Save</button>
+        <button id="delete-btn" class="btn" disabled>Delete</button>
+      </div>
+    </header>
+
+    <div id="contextual-settings" class="flex items-center space-x-2 mb-4"></div>
+    <div id="canvas" class="flex-1 flex items-center justify-center"></div>
+  </main>
+
+  <script>
 document.addEventListener('DOMContentLoaded', async () => {
     const furnitureList = document.getElementById('furniture-list');
     const architecturalList = document.getElementById('architectural-list');
@@ -8,6 +358,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadBtn = document.getElementById('load-btn');
     const loadLayoutInput = document.getElementById('load-layout-input');
     const contextualSettings = document.getElementById('contextual-settings');
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+    const closeSidebarBtn = document.getElementById('close-sidebar');
+    const floatingSidebar = document.getElementById('floating-sidebar');
+    
     let roomContainer;
     let selectedObject = null;
     let objectCounter = 0;
@@ -27,6 +381,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         { name: 'Door', type: 'door', image: '/static/images/door.png', width: 90, openingHeight: 210 },
         { name: 'Window', type: 'window', image: '/static/images/window.png', width: 120, openingHeight: 100 }
     ];
+
+    toggleSidebarBtn.addEventListener('click', () => {
+        floatingSidebar.classList.toggle('hidden');
+    });
+
+    closeSidebarBtn.addEventListener('click', () => {
+        floatingSidebar.classList.add('hidden');
+    });
 
     async function precomputeBounds() {
         const promises = furnitureCatalog.map(item => new Promise(resolve => {
@@ -51,8 +413,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 }
-                const boundsWidth = maxX - minX + 1 || tempCanvas.width; // Fallback if no pixels
-                const boundsHeight = maxY - minY + 1 || tempCanvas.height;
+                const boundsWidth = maxX - minX + 1;
+                const boundsHeight = maxY - minY + 1;
                 furnitureBounds[item.name] = { minX, minY, width: boundsWidth, height: boundsHeight, naturalScale: item.width / boundsWidth };
                 furnitureRatios[item.name] = img.naturalHeight / img.naturalWidth;
                 resolve();
@@ -104,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const axes = [v1[0].x - v1[1].x, v1[0].y - v1[1].y, v1[1].x - v1[2].x, v1[1].y - v1[2].y, v2[0].x - v2[1].x, v2[0].y - v2[1].y, v2[1].x - v2[2].x, v2[1].y - v2[2].y].map((val, i, arr) => i % 2 === 0 ? { x: -arr[i + 1], y: val } : null).filter(v => v);
         for (let axis of axes) {
             let p1 = v1.map(v => v.x * axis.x + v.y * axis.y);
-            let p2 = v2.map(v => v.x * axis.x + v.y* axis.y);
+            let p2 = v2.map(v => v.x * axis.x + v.y * axis.y);
             let min1 = Math.min(...p1), max1 = Math.max(...p1);
             let min2 = Math.min(...p2), max2 = Math.max(...p2);
             if (max1 < min2 || max2 < min1) return false;
@@ -139,11 +501,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const baseWidth = 80;
             const scaledHeight = Math.max(40, baseWidth * aspectRatio);
             div.innerHTML = `<div class="sidebar-icon" style="width:${baseWidth + 16}px;height:${scaledHeight + 16}px;"><img src="${item.image}" style="width:${baseWidth}px;height:${scaledHeight}px;object-fit:contain;" draggable="false" /></div><span class="font-medium text-sm text-slate-200 mt-2">${item.name}</span>`;
-            div.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', e.currentTarget.dataset.item);
-                const img = new Image();
-                e.dataTransfer.setDragImage(img, 0, 0); // No ghost image
-            });
+            div.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', e.currentTarget.dataset.item));
             return div;
         };
         furnitureCatalog.forEach(item => furnitureList.appendChild(createSidebarItem(item)));
@@ -403,13 +761,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         selectedObject.classList.add('selected');
         deleteBtn.disabled = false;
         if (obj.classList.contains('furniture')) {
-            contextualSettings.innerHTML = `<label for="cs-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-height" class="w-20 border-gray-300 rounded-md shadow-sm text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.zHeight}"><button id="cs-set-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
+            contextualSettings.innerHTML = `<label for="cs-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-height" class="w-20 border-gray-300 rounded-md shadow-sm text-sm bg-slate-700 text-white border-slate-600 px-2 py-1" value="${obj.dataset.zHeight}"><button id="cs-set-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
             document.getElementById('cs-set-height').addEventListener('click', () => {
                 obj.dataset.zHeight = document.getElementById('cs-height').value;
                 updateFurnitureDimensionLabel(obj);
             });
         } else if (obj.classList.contains('window')) {
-            contextualSettings.innerHTML = `<label for="cs-sill" class="text-sm text-slate-200 mr-2">Sill(cm):</label><input type="number" id="cs-sill" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.heightFromGround}"><label for="cs-o-height" class="text-sm text-slate-200 ml-2 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.openingHeight}">`;
+            contextualSettings.innerHTML = `<label for="cs-sill" class="text-sm text-slate-200 mr-2">Sill(cm):</label><input type="number" id="cs-sill" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600 px-2 py-1" value="${obj.dataset.heightFromGround}"><label for="cs-o-height" class="text-sm text-slate-200 ml-2 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600 px-2 py-1" value="${obj.dataset.openingHeight}">`;
             document.getElementById('cs-sill').addEventListener('change', e => {
                 obj.dataset.heightFromGround = e.target.value;
                 updateWallFeatureDimensionLabel(obj);
@@ -419,7 +777,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updateWallFeatureDimensionLabel(obj);
             });
         } else if (obj.classList.contains('door')) {
-            contextualSettings.innerHTML = `<label for="cs-o-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600" value="${obj.dataset.openingHeight}"><button id="cs-set-o-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
+            contextualSettings.innerHTML = `<label for="cs-o-height" class="text-sm text-slate-200 mr-2">Height(cm):</label><input type="number" id="cs-o-height" class="w-20 border-gray-300 rounded-md text-sm bg-slate-700 text-white border-slate-600 px-2 py-1" value="${obj.dataset.openingHeight}"><button id="cs-set-o-height" class="px-3 py-1 bg-blue-500 text-white text-xs rounded ml-2 hover:bg-blue-600">Set</button>`;
             document.getElementById('cs-set-o-height').addEventListener('click', () => {
                 obj.dataset.openingHeight = document.getElementById('cs-o-height').value;
                 updateWallFeatureDimensionLabel(obj);
@@ -447,7 +805,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         obj.style.top = `${pos.y}px`;
         obj.style.transform = `rotate(${pos.rotation || 0}deg)`;
 
-        // Append handles and dim display first
         obj.innerHTML = `<div class="handle resize-handle"></div><div class="handle rotate-handle"></div><div class="dimension-display"></div>`;
 
         const img = document.createElement('img');
@@ -458,7 +815,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         img.style.left = '0';
         obj.appendChild(img);
 
-        // Use precomputed bounds to set size and position
         const bounds = furnitureBounds[itemData.name];
         if (bounds) {
             const scale = itemData.width / bounds.width;
@@ -656,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         canvas.innerHTML = '';
         initializeApp(data.room.width, data.room.height);
         (data.openings || []).forEach(o => createWallFeature(o.type, o));
-        (data.furniture || []).forEach((f, index) => {
+        (data.furniture || []).forEach((f) => {
             const catalogItem = furnitureCatalog.find(item => item.name === f.name);
             if (catalogItem) {
                 const itemData = { ...catalogItem, width: f.width, height: f.height, zHeight: f.zHeight };
@@ -737,3 +1093,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateSidebar();
     initializeApp();
 });
+  </script>
+</body>
+</html>

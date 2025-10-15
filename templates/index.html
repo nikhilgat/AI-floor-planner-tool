@@ -51,6 +51,8 @@
       position: absolute;
       top: 0;
       left: 0;
+      pointer-events: none;
+      z-index: 1;
     }
 
     .colliding {
@@ -66,6 +68,8 @@
       border-radius: 50%;
       opacity: 0;
       transition: opacity 0.2s;
+      z-index: 10;
+      pointer-events: auto;
     }
 
     .furniture.selected .handle {
@@ -82,6 +86,12 @@
       top: -24px;
       left: calc(50% - 6px);
       cursor: grab;
+      width: 16px;
+      height: 16px;
+    }
+
+    .rotate-handle:hover {
+      background-color: #1d4ed8;
     }
 
     .rotate-handle.snapped {
@@ -201,6 +211,9 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border: none;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     #load-btn {
@@ -243,7 +256,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      border: none; /* Removed border */
+      border: none;
     }
 
     .toggle-switch {
@@ -302,10 +315,10 @@
         <div id="contextual-settings" class="flex items-center space-x-2"></div>
 
         <div class="flex items-center space-x-3">
-          <button id="load-btn">Load Layout</button>
+          <button id="load-btn">🔄 Load Layout</button>
           <input type="file" id="load-layout-input" class="hidden" accept=".json">
-          <button id="save-btn">Save Layout</button>
-          <button id="delete-btn" disabled>Delete</button>
+          <button id="save-btn">💾 Save Layout</button>
+          <button id="delete-btn" disabled>🗑️ Delete</button>
         </div>
       </header>
 
