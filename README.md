@@ -25,7 +25,6 @@ AI‑Floor‑Planner‑Tool/
   - HTML pages served to users
   - JavaScript for interactive layout editing or form submission
   - CSS for styling the interface
-  - Possibly includes drawing canvases, blueprint views, or form inputs
 
 ## Getting Started
 
@@ -71,7 +70,3 @@ AI‑Floor‑Planner‑Tool/
 - Update `.gitignore` to exclude sensitive files or environment variables.
 - Document dependencies and setup step-by-step once more code is added.
 - Consider adding unit tests for backend logic and frontend interaction.
-
-## License
-
-*(Add license details if available)*
