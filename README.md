@@ -6,20 +6,19 @@ A lightweight web application enabling floor plan creation and interaction with 
 
 ```
 AI‑Floor‑Planner‑Tool/
-├─ .vscode/           # IDE settings—safe to ignore
 ├─ static/            # Static assets (JS, CSS, images)
-├─ templates/         # HTML or Jinja2 templates for rendering
-├─ app.py             # Main Python application (probably Flask)
+├─ templates/         # HTML and Jinja2 templates for rendering
+├─ app.py             # Main Python application (FLASK)
 ├─ README.md          # This file
 └─ .gitignore
 ```
 
 ## Overview
 
-- **Backend (`app.py`)**: Likely built with Flask (or another Python web framework). Handles:
-  - API endpoints for floor plan generation or editing
+- **Backend (`app.py`)**: Built with Flask it Handles:
+  - API endpoints for floor plan generation
   - Loading or interfacing with an underlying AI model (local or remote)
-  - Rendering web pages or returning JSON data
+  - Rendering web pages and returning JSON data
 
 - **Frontend (`templates/`, `static/`)**:
   - HTML pages served to users
@@ -45,15 +44,13 @@ AI‑Floor‑Planner‑Tool/
 3. **Access the interface**:
    Open `http://localhost:5000` (or the port printed by `app.py`).
 
-## Usage (Hypothetical)
+## Usage
 
-- The landing page may allow:
-  - Uploading or drawing a room boundary
+- The landing page allowa:
+  - Drawing a room boundary with furnitures
   - Selecting furniture or layout options
   - Triggering the AI model to generate or adjust layouts
   - Downloading or viewing resulting floor plans
-
-- Backend endpoints (e.g., `/generate`, `/save`) may handle JSON input/output.
 
 ## Extension Ideas
 
@@ -64,9 +61,3 @@ AI‑Floor‑Planner‑Tool/
 - **User Profiles**: Authentication, saving projects, versioning layouts.
 - **Mobile Responsiveness**: Ensure UI works across devices.
 - **Deployment**: Add Dockerfile or deployment instructions for hosting.
-
-## Development Notes
-
-- Update `.gitignore` to exclude sensitive files or environment variables.
-- Document dependencies and setup step-by-step once more code is added.
-- Consider adding unit tests for backend logic and frontend interaction.
