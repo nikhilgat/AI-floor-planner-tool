@@ -24,7 +24,6 @@ AI‑Floor‑Planner‑Tool/
   - HTML pages served to users
   - JavaScript for interactive layout editing or form submission
   - CSS for styling the interface
-  - Possibly includes drawing canvases, blueprint views, or form inputs
 
 ## Getting Started
 
